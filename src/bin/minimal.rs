@@ -65,7 +65,7 @@ mod app {
         //unsafe{NVIC::unmask(Interrupt::EXTI0)};
         
         // Enable EXTI0 interrupt in the NVIC
-       // delete_all_pg(); 
+        //delete_all_pg(); 
         restore();
         //update_regs();
         // c_checkpoint::spawn(true).ok();
@@ -109,12 +109,14 @@ mod app {
     #[no_mangle]
     fn c_checkpoint( c_type: bool){
         //cortex_m::interrupt::disable();
-        unsafe{asm!("add sp, #76");}
+        unsafe{asm!("push {{r1}}");}
+        unsafe{asm!("add sp, #80");}
         unsafe{asm!("pop	{{r8, r9, sl, fp}}")};
         unsafe{asm!("pop	{{r4, r5, r6, r7, lr}}")};
         unsafe{asm!("push	{{r4, r5, r6, r7, lr}}")};
         unsafe{asm!("push	{{r8, r9, sl, fp}}")};
-        unsafe{asm!("sub sp, #76");}
+        unsafe{asm!("sub sp, #80");}
+        unsafe{asm!("pop {{r1}}");}
         let r0_value: u32;
         let r1_value: u32;
         let r2_value: u32;

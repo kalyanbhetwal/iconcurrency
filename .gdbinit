@@ -3,7 +3,6 @@ load
 monitor arm semihosting enable
 b _start
 break main
-break minimal.rs:68
 break minimal.rs:69
 break minimal.rs:104
 break minimal.rs:112
