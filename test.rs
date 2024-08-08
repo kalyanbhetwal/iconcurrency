@@ -421,10 +421,6 @@ mod checkpoint {
         }
     }
 }
-use checkpoint::{
-    checkpoint, restore, delete_pg, delete_all_pg, transcation_log, execution_mode,
-    counter, start_atomic, end_atomic,
-};
 use volatile::Volatile;
 use checkpoint::my_flash::{
     unlock, wait_ready, clear_error_flags, erase_page, write_to_flash,
@@ -443,10 +439,6 @@ pub mod app {
     use cortex_m::asm::{nop, self};
     use crate::checkpoint::end_atomic;
     use crate::checkpoint::start_atomic;
-    use crate::checkpoint::{self, delete_all_pg, restore, checkpoint, erase_all};
-    use crate::checkpoint::my_flash::{
-        unlock, wait_ready, clear_error_flags, erase_page, write_to_flash,
-    };
     use stm32f3xx_hal_v2::{
         pac::{self, NVIC},
         pac::Peripherals, pac::FLASH, pac::Interrupt, gpio::{gpioa::PA0, Input, PullUp},
@@ -741,7 +733,6 @@ pub mod app {
     #[allow(non_snake_case)]
     fn init(ctx: init::Context) -> (Shared, Local) {
         let mut dp = ctx.device;
-        restore();
         ::cortex_m_semihosting::export::hstdout_str("init\n");
         async_task1::spawn().ok();
         unsafe {
@@ -886,7 +877,6 @@ pub mod app {
         use rtic::mutex::prelude::*;
         start_atomic();
         ::cortex_m_semihosting::export::hstdout_str("I am in task1 before cp\n");
-        c_checkpoint(false);
         ::cortex_m_semihosting::export::hstdout_str("I am in task1 after cp\n");
         end_atomic();
     }
