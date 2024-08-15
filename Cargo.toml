@@ -24,7 +24,7 @@ stm32f3xx-hal-v2 = {version = "0.6.0", features = ["stm32f303xc","rt"] }
 # cargo build/run
 [profile.dev]
 codegen-units = 1
-debug = 2
+debug = true
 debug-assertions = true # <-
 incremental = false
 opt-level = "s" # <-

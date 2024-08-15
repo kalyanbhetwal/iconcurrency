@@ -8,7 +8,7 @@
 use core::prelude::rust_2021::*;
 #[macro_use]
 extern crate core;
-// extern crate compiler_builtins as _;
+extern crate compiler_builtins as _;
 use test_app as _;
 use stm32f3xx_hal_v2::pac::Interrupt;
 use cortex_m::peripheral::NVIC;
@@ -346,7 +346,7 @@ mod checkpoint {
                 restore_globals();
                 *counter = 0;
             }
-            //flash_start_address;
+            flash_start_address += 4;
             asm!("mov r0, {0}", in (reg) flash_start_address);
             asm!("movw r1, 0xfff8\n        movt r1, 0x02000");
             asm!("msr msp, r1");
@@ -423,7 +423,6 @@ mod checkpoint {
     }
     #[no_mangle]
     pub fn c_checkpoint(c_type: bool) {
-        unsafe{asm!("NOP");}
         unsafe {
             asm!("push {{r1}}");
         }
@@ -664,7 +663,6 @@ mod checkpoint {
                 r15_pc as u32,
             );
         }
-    
     }
 }
 use checkpoint::{
@@ -746,8 +744,6 @@ pub mod app {
     #[inline(always)]
     #[allow(non_snake_case)]
     fn init(ctx: init::Context) -> (Shared, Local) {
-        //delete_all_pg(); 
-        restore();
         ::cortex_m_semihosting::export::hstdout_str("init\n");
         async_task1::spawn().ok();
         async_task2::spawn().ok();
@@ -881,7 +877,6 @@ pub mod app {
         use rtic::mutex::prelude::*;
         ::cortex_m_semihosting::export::hstdout_str("I am in task1 before cp\n");
         c_checkpoint(false);
-       // unsafe{asm!("NOP");}
         ::cortex_m_semihosting::export::hstdout_str("I am in task1 after cp\n");
     }
     #[allow(non_snake_case)]
@@ -941,11 +936,11 @@ pub mod app {
         let _ = you_must_enable_the_rt_feature_for_the_pac_in_your_cargo_toml::interrupt::TIM4;
         const _: () = if (1 << stm32f3xx_hal_v2::pac::NVIC_PRIO_BITS) < 3u8 as usize {
             {
-                // ::core::panicking::panic_fmt(
-                //     format_args!(
-                //         "Maximum priority used by interrupt vector \'TIM4\' is more than supported by hardware",
-                //     ),
-                // );
+                ::core::panicking::panic_fmt(
+                    format_args!(
+                        "Maximum priority used by interrupt vector \'TIM4\' is more than supported by hardware",
+                    ),
+                );
             };
         };
         core.NVIC
@@ -986,9 +981,9 @@ pub mod app {
         if stack_start > ebss {
             if rtic::export::msp::read() <= ebss {
                 {
-                    // ::core::panicking::panic_fmt(
-                    //     format_args!("Stack overflow after allocating executors"),
-                    // );
+                    ::core::panicking::panic_fmt(
+                        format_args!("Stack overflow after allocating executors"),
+                    );
                 };
             }
         }
