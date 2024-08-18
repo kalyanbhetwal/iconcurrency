@@ -137,14 +137,14 @@ mod app {
         // );
     }
 
-    #[task(priority = 3)]
+    #[task(priority = 4)]
     async fn async_task2(mut cx: async_task2::Context) {
         hprintln!("I am in task2");
         hprintln!("I am doing more operation");
         hprintln!("I am doing more operation 3");
 
         //c_checkpoint(false);
-        //async_task3::spawn().ok();
+        async_task3::spawn().ok();
 
         // hprintln!(
         //     "hello from async 2 a {}",
@@ -155,15 +155,16 @@ mod app {
         // );
     }
 
-    // #[task(priority = 4, shared = [a])]
-    // async fn async_task3(mut cx: async_task3::Context) {
-    //     hprintln!(
-    //         "hello from async 3 a {}",
-    //         cx.shared.a.lock(|a| {
-    //             *a += 1;
-    //             *a
-    //         })
-    //     );
-    // }
+    #[task(priority = 5)]
+    async fn async_task3(mut cx: async_task3::Context) {
+        unsafe{asm!("NOP");}
+        // hprintln!(
+        //     "hello from async 3 a {}",
+        //     cx.shared.a.lock(|a| {
+        //         *a += 1;
+        //         *a
+        //     })
+        // );
+    }
     //fn restore(){}
 }
