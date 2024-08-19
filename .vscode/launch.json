@@ -1,101 +1,19 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "lldb",
+            "type": "cortex-debug",
             "request": "launch",
-            "name": "Debug unit tests in library 'test_app'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--lib",
-                    "--package=test-app"
-                ],
-                "filter": {
-                    "name": "test_app",
-                    "kind": "lib"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug executable 'minimal'",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--bin=minimal",
-                    "--package=test-app"
-                ],
-                "filter": {
-                    "name": "minimal",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in executable 'minimal'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--bin=minimal",
-                    "--package=test-app"
-                ],
-                "filter": {
-                    "name": "minimal",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug executable 'my_running_exp'",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--bin=my_running_exp",
-                    "--package=test-app"
-                ],
-                "filter": {
-                    "name": "my_running_exp",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in executable 'my_running_exp'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--bin=my_running_exp",
-                    "--package=test-app"
-                ],
-                "filter": {
-                    "name": "my_running_exp",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
+            "servertype": "openocd",
+            "cwd": "${workspaceRoot}",
+            "executable": "./target/thumbv7em-none-eabihf/debug/minimal",
+            "name": "Debug (OpenOCD)",
+            "device": "STM32F303VCT6",
+            "configFiles": [
+                "interface/stlink.cfg",
+                "target/stm32f3x.cfg"
+            ],
+            "runToMain": true
         }
     ]
 }
