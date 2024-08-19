@@ -747,7 +747,7 @@ pub mod app {
     #[allow(non_snake_case)]
     fn init(ctx: init::Context) -> (Shared, Local) {
         //delete_all_pg(); 
-        //restore();
+        restore();
         ::cortex_m_semihosting::export::hstdout_str("init\n");
         async_task1::spawn().ok();
         async_task2::spawn().ok();
@@ -880,7 +880,7 @@ pub mod app {
         use rtic::Mutex as _;
         use rtic::mutex::prelude::*;
         ::cortex_m_semihosting::export::hstdout_str("I am in task1 before cp\n");
-        //c_checkpoint(false);
+        c_checkpoint(false);
        // unsafe{asm!("NOP");}
        let mode: u32;
        unsafe{asm!("MRS {0}, CONTROL", out(reg) mode )};
