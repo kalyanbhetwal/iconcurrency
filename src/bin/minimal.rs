@@ -12,6 +12,13 @@ extern crate core;
 use test_app as _;
 use stm32f3xx_hal_v2::pac::Interrupt;
 use cortex_m::peripheral::NVIC;
+use cortex_m::peripheral::MPU;
+
+const MPU_CTRL_ADDR: usize = 0xE000ED94;
+const MPU_CTRL_ENABLE_BIT: u32 = 1 << 0; // Bit 0 is the ENABLE bit
+const MPU_CTRL: *mut u32 = 0xE000ED94 as *mut u32;
+
+
 mod checkpoint {
     #![allow(unsafe_code, non_upper_case_globals)]
     pub mod my_flash {
@@ -96,6 +103,11 @@ mod checkpoint {
     use ::core::arch::asm;
     use stm32f3xx_hal_v2::{pac::Peripherals, pac::FLASH};
     use volatile::Volatile;
+
+    use cortex_m::peripheral::MPU;
+    use crate::MPU_CTRL;
+    use crate::MPU_CTRL_ADDR;
+    use crate::MPU_CTRL_ENABLE_BIT;
     pub static mut transcation_log: u32 = 0x60004000;
     pub static mut execution_mode: bool = true;
     pub static mut counter: *mut u8 = 0x60003002 as *mut u8;
@@ -319,8 +331,41 @@ mod checkpoint {
             }
         }
     }
+
+    fn enter_privileged_mode() {
+        unsafe {
+            asm!(
+                "MOV R0, #0", // Set R0 to 0
+                "MSR CONTROL, R0", // Write to the CONTROL register
+                "ISB", // Instruction Synchronization Barrier to ensure changes are applied
+                options(nostack) // Specify that the stack is not used
+            );
+        }
+    }
+
+    fn set_xpsr(new_xpsr: u32) {
+        unsafe {
+            asm!(
+                "MSR xPSR, {0}",   // Write the new value to xPSR
+                in(reg) new_xpsr,
+                options(nostack, preserves_flags)  // No stack usage and preserves flags
+            );
+        }
+    }
+    
+  
+    fn disable_mpu() {
+        unsafe {
+            let mut ctrl = MPU_CTRL.read_volatile();
+            ctrl &= !(1 << 0); // Clear the Enable bit (bit 0)
+            MPU_CTRL.write_volatile(ctrl);
+        }
+    }
+    
     pub fn restore() -> bool {
         unsafe {
+            //enter_privileged_mode(); //asm!("msr CONTROL, #0");
+            disable_mpu();
             let mut flash_start_address = 0x0803_0000;
             let packet_size = ptr::read_volatile(0x0803_0000 as *const u32);
             if packet_size == 0xffff_ffff {
@@ -387,6 +432,7 @@ mod checkpoint {
             asm!("LDR r14, [r0]");
             asm!("POP {{r0}}");
             asm!("cpsie i");
+           //set_xpsr(0x4100002e);
             asm!("mov r15, r14");
             asm!("adds sp, sp, #56");
             asm!("adds sp, sp, #8");
@@ -701,6 +747,7 @@ pub mod app {
         pac::Peripherals, pac::FLASH, pac::Interrupt, gpio::{gpioa::PA0, Input, PullUp},
     };
     use volatile::Volatile;
+
     /// User code end
     ///Shared resources
     struct Shared {}
@@ -747,7 +794,7 @@ pub mod app {
     #[allow(non_snake_case)]
     fn init(ctx: init::Context) -> (Shared, Local) {
         //delete_all_pg(); 
-        restore();
+        //restore();
         ::cortex_m_semihosting::export::hstdout_str("init\n");
         async_task1::spawn().ok();
         async_task2::spawn().ok();
@@ -880,7 +927,7 @@ pub mod app {
         use rtic::Mutex as _;
         use rtic::mutex::prelude::*;
         ::cortex_m_semihosting::export::hstdout_str("I am in task1 before cp\n");
-        c_checkpoint(false);
+        //c_checkpoint(false);
        // unsafe{asm!("NOP");}
        let mode: u32;
        unsafe{asm!("MRS {0}, CONTROL", out(reg) mode )};
@@ -932,6 +979,18 @@ pub mod app {
                 });
             },
         );
+        unsafe{asm!("NOP");}
+        unsafe{asm!("add	sp, #40	");}
+        unsafe{asm!("add	sp, #4");}
+        unsafe{asm!("pop	{{r4, r5, r6, r7}}");}
+        unsafe{asm!("add	sp, #4");}
+        unsafe{asm!("POP {{r0, r1, r2,r3}}");}
+        unsafe{asm!("POP {{r12, lr}}");}
+        unsafe{asm!("POP {{r0}}");}
+        unsafe{asm!("add	sp, #4");}
+        unsafe{asm!("mov pc, r0");}
+    //    // unsafe{asm!("POP {{r0, r1, r2,r3, pc,lr}}");}
+
     }
     #[doc(hidden)]
     #[no_mangle]
