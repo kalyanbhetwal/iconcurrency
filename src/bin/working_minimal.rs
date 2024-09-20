@@ -8,10 +8,17 @@
 use core::prelude::rust_2021::*;
 #[macro_use]
 extern crate core;
-//extern crate compiler_builtins as _;
+// extern crate compiler_builtins as _;
 use test_app as _;
 use stm32f3xx_hal_v2::pac::Interrupt;
 use cortex_m::peripheral::NVIC;
+use cortex_m::peripheral::MPU;
+
+const MPU_CTRL_ADDR: usize = 0xE000ED94;
+const MPU_CTRL_ENABLE_BIT: u32 = 1 << 0; // Bit 0 is the ENABLE bit
+const MPU_CTRL: *mut u32 = 0xE000ED94 as *mut u32;
+
+
 mod checkpoint {
     #![allow(unsafe_code, non_upper_case_globals)]
     pub mod my_flash {
@@ -96,6 +103,11 @@ mod checkpoint {
     use ::core::arch::asm;
     use stm32f3xx_hal_v2::{pac::Peripherals, pac::FLASH};
     use volatile::Volatile;
+
+    use cortex_m::peripheral::MPU;
+    use crate::MPU_CTRL;
+    use crate::MPU_CTRL_ADDR;
+    use crate::MPU_CTRL_ENABLE_BIT;
     pub static mut transcation_log: u32 = 0x60004000;
     pub static mut execution_mode: bool = true;
     pub static mut counter: *mut u8 = 0x60003002 as *mut u8;
@@ -218,7 +230,7 @@ mod checkpoint {
             wait_ready(&flash);
             let mut start_address: u32;
             let end_address = r13_sp;
-            asm!("movw r0, 0xFFFC\n             movt r0, 0x2000");
+            asm!("movw r0, 0xFFF8\n             movt r0, 0x2000");
             asm!("MOV {0}, r0", out(reg) start_address);
             let stack_size = (start_address - end_address) + 4;
             let mut flash_start_address = Volatile::new(0x0803_0000);
@@ -319,8 +331,41 @@ mod checkpoint {
             }
         }
     }
+
+    fn enter_privileged_mode() {
+        unsafe {
+            asm!(
+                "MOV R0, #0", // Set R0 to 0
+                "MSR CONTROL, R0", // Write to the CONTROL register
+                "ISB", // Instruction Synchronization Barrier to ensure changes are applied
+                options(nostack) // Specify that the stack is not used
+            );
+        }
+    }
+
+    fn set_xpsr(new_xpsr: u32) {
+        unsafe {
+            asm!(
+                "MSR xPSR, {0}",   // Write the new value to xPSR
+                in(reg) new_xpsr,
+                options(nostack, preserves_flags)  // No stack usage and preserves flags
+            );
+        }
+    }
+    
+  
+    fn disable_mpu() {
+        unsafe {
+            let mut ctrl = MPU_CTRL.read_volatile();
+            ctrl &= !(1 << 0); // Clear the Enable bit (bit 0)
+            MPU_CTRL.write_volatile(ctrl);
+        }
+    }
+    
     pub fn restore() -> bool {
         unsafe {
+            //enter_privileged_mode(); //asm!("msr CONTROL, #0");
+            disable_mpu();
             let mut flash_start_address = 0x0803_0000;
             let packet_size = ptr::read_volatile(0x0803_0000 as *const u32);
             if packet_size == 0xffff_ffff {
@@ -346,7 +391,7 @@ mod checkpoint {
                 restore_globals();
                 *counter = 0;
             }
-            flash_start_address += 4;
+            //flash_start_address;
             asm!("mov r0, {0}", in (reg) flash_start_address);
             asm!("movw r1, 0xfff8\n        movt r1, 0x02000");
             asm!("msr msp, r1");
@@ -387,6 +432,7 @@ mod checkpoint {
             asm!("LDR r14, [r0]");
             asm!("POP {{r0}}");
             asm!("cpsie i");
+           //set_xpsr(0x4100002e);
             asm!("mov r15, r14");
             asm!("adds sp, sp, #56");
             asm!("adds sp, sp, #8");
@@ -423,6 +469,7 @@ mod checkpoint {
     }
     #[no_mangle]
     pub fn c_checkpoint(c_type: bool) {
+        unsafe{asm!("NOP");}
         unsafe {
             asm!("push {{r1}}");
         }
@@ -504,7 +551,7 @@ mod checkpoint {
             asm!("MOV r0, sp");
         }
         unsafe {
-            asm!("add r0, #108");
+            asm!("add r0, #112");
         }
         unsafe {
             asm!("MOV {0}, r0", out(reg) r13_sp);
@@ -516,7 +563,7 @@ mod checkpoint {
             wait_ready(&flash);
             let mut start_address: u32;
             let end_address = r13_sp;
-            asm!("movw r0, 0xFFFC\n         movt r0, 0x2000");
+            asm!("movw r0, 0xFFF8\n         movt r0, 0x2000");
             asm!("MOV {0}, r0", out(reg) start_address);
             let stack_size = (start_address - end_address) + 4;
             let mut flash_start_address = Volatile::new(0x0803_0000);
@@ -663,6 +710,7 @@ mod checkpoint {
                 r15_pc as u32,
             );
         }
+    
     }
 }
 use checkpoint::{
@@ -670,8 +718,6 @@ use checkpoint::{
     counter, start_atomic, end_atomic,
 };
 use volatile::Volatile;
-use cortex_m::peripheral::syst::SystClkSource;
-use cortex_m_rt::{entry, exception};
 use checkpoint::my_flash::{
     unlock, wait_ready, clear_error_flags, erase_page, write_to_flash,
 };
@@ -695,29 +741,13 @@ pub mod app {
     };
     use crate::checkpoint::my_flash::{
         unlock, wait_ready, clear_error_flags, erase_page, write_to_flash,
-    };  
-    use cortex_m::peripheral::syst::SystClkSource;
-    use cortex_m_rt::exception;
+    };
     use stm32f3xx_hal_v2::{
         pac::{self, NVIC},
         pac::Peripherals, pac::FLASH, pac::Interrupt, gpio::{gpioa::PA0, Input, PullUp},
     };
     use volatile::Volatile;
-    #[doc(hidden)]
-    #[export_name = "SysTick"]
-    pub unsafe extern "C" fn __cortex_m_rt_SysTick_trampoline() {
-        __cortex_m_rt_SysTick()
-    }
-    fn __cortex_m_rt_SysTick() {
-        {
-            extern crate cortex_m_rt;
-            cortex_m_rt::Exception::SysTick;
-        }
-        let p = cortex_m::Peripherals::take().unwrap();
-        let mut syst = p.SYST;
-        syst.disable_counter();
-        restore();
-    }
+
     /// User code end
     ///Shared resources
     struct Shared {}
@@ -763,14 +793,8 @@ pub mod app {
     #[inline(always)]
     #[allow(non_snake_case)]
     fn init(ctx: init::Context) -> (Shared, Local) {
-        //delete_all_pg();
-        let p = cortex_m::Peripherals::take().unwrap();
-        let mut syst = p.SYST;
-        syst.set_clock_source(SystClkSource::Core);
-        syst.set_reload(12_000_000);
-        syst.clear_current();
-        syst.enable_counter();
-        syst.enable_interrupt();
+        //delete_all_pg(); 
+        //restore();
         ::cortex_m_semihosting::export::hstdout_str("init\n");
         async_task1::spawn().ok();
         async_task2::spawn().ok();
@@ -841,7 +865,7 @@ pub mod app {
             );
             if exec.try_allocate() {
                 exec.spawn(async_task1(unsafe { async_task1::Context::new() }));
-                rtic::export::pend(stm32f3xx_hal_v2::pac::interrupt::TIM2);
+                rtic::export::pend(stm32f3xx_hal_v2::pac::interrupt::TIM4);
                 Ok(())
             } else {
                 Err(())
@@ -883,7 +907,7 @@ pub mod app {
             );
             if exec.try_allocate() {
                 exec.spawn(async_task2(unsafe { async_task2::Context::new() }));
-                rtic::export::pend(stm32f3xx_hal_v2::pac::interrupt::TIM3);
+                rtic::export::pend(stm32f3xx_hal_v2::pac::interrupt::TIM4);
                 Ok(())
             } else {
                 Err(())
@@ -898,53 +922,16 @@ pub mod app {
         #[doc(inline)]
         pub use super::__rtic_internal_async_task2_spawn as spawn;
     }
-    /// Execution context
-    #[allow(non_snake_case)]
-    #[allow(non_camel_case_types)]
-    pub struct __rtic_internal_async_task3_Context<'a> {
-        #[doc(hidden)]
-        __rtic_internal_p: ::core::marker::PhantomData<&'a ()>,
-    }
-    impl<'a> __rtic_internal_async_task3_Context<'a> {
-        #[inline(always)]
-        #[allow(missing_docs)]
-        pub unsafe fn new() -> Self {
-            __rtic_internal_async_task3_Context {
-                __rtic_internal_p: ::core::marker::PhantomData,
-            }
-        }
-    }
-    /// Spawns the task directly
-    #[allow(non_snake_case)]
-    #[doc(hidden)]
-    pub fn __rtic_internal_async_task3_spawn() -> Result<(), ()> {
-        unsafe {
-            let exec = rtic::export::executor::AsyncTaskExecutor::from_ptr_1_args(
-                async_task3,
-                &__rtic_internal_async_task3_EXEC,
-            );
-            if exec.try_allocate() {
-                exec.spawn(async_task3(unsafe { async_task3::Context::new() }));
-                rtic::export::pend(stm32f3xx_hal_v2::pac::interrupt::TIM4);
-                Ok(())
-            } else {
-                Err(())
-            }
-        }
-    }
-    #[allow(non_snake_case)]
-    ///Software task
-    pub mod async_task3 {
-        #[doc(inline)]
-        pub use super::__rtic_internal_async_task3_Context as Context;
-        #[doc(inline)]
-        pub use super::__rtic_internal_async_task3_spawn as spawn;
-    }
     #[allow(non_snake_case)]
     async fn async_task1<'a>(mut cx: async_task1::Context<'a>) {
         use rtic::Mutex as _;
         use rtic::mutex::prelude::*;
         ::cortex_m_semihosting::export::hstdout_str("I am in task1 before cp\n");
+        //c_checkpoint(false);
+       // unsafe{asm!("NOP");}
+       let mode: u32;
+       unsafe{asm!("MRS {0}, CONTROL", out(reg) mode )};
+       ::cortex_m_semihosting::export::hstdout_fmt(format_args!("mode {}\n", mode),);
         ::cortex_m_semihosting::export::hstdout_str("I am in task1 after cp\n");
     }
     #[allow(non_snake_case)]
@@ -952,28 +939,15 @@ pub mod app {
         use rtic::Mutex as _;
         use rtic::mutex::prelude::*;
         ::cortex_m_semihosting::export::hstdout_str("I am in task2\n");
-        async_task3::spawn().ok();
-        ::cortex_m_semihosting::export::hstdout_str("I am doing more operation\n");
-    }
-    #[allow(non_snake_case)]
-    async fn async_task3<'a>(mut cx: async_task3::Context<'a>) {
-        use rtic::Mutex as _;
-        use rtic::mutex::prelude::*;
-        unsafe {
-            asm!("NOP");
-        }
-        ::cortex_m_semihosting::export::hstdout_str("I am doing more operation 3\n");
     }
     #[allow(non_upper_case_globals)]
     static __rtic_internal_async_task1_EXEC: rtic::export::executor::AsyncTaskExecutorPtr = rtic::export::executor::AsyncTaskExecutorPtr::new();
     #[allow(non_upper_case_globals)]
     static __rtic_internal_async_task2_EXEC: rtic::export::executor::AsyncTaskExecutorPtr = rtic::export::executor::AsyncTaskExecutorPtr::new();
-    #[allow(non_upper_case_globals)]
-    static __rtic_internal_async_task3_EXEC: rtic::export::executor::AsyncTaskExecutorPtr = rtic::export::executor::AsyncTaskExecutorPtr::new();
     #[allow(non_snake_case)]
     ///Interrupt handler to dispatch async tasks at priority 3
     #[no_mangle]
-    unsafe fn TIM2() {
+    unsafe fn TIM4() {
         /// The priority of this interrupt handler
         const PRIORITY: u8 = 3u8;
         rtic::export::run(
@@ -989,20 +963,8 @@ pub mod app {
                         &__rtic_internal_async_task1_EXEC,
                     );
                     exec.set_pending();
-                    rtic::export::pend(stm32f3xx_hal_v2::pac::interrupt::TIM2);
+                    rtic::export::pend(stm32f3xx_hal_v2::pac::interrupt::TIM4);
                 });
-            },
-        );
-    }
-    #[allow(non_snake_case)]
-    ///Interrupt handler to dispatch async tasks at priority 4
-    #[no_mangle]
-    unsafe fn TIM3() {
-        /// The priority of this interrupt handler
-        const PRIORITY: u8 = 4u8;
-        rtic::export::run(
-            PRIORITY,
-            || {
                 let exec = rtic::export::executor::AsyncTaskExecutor::from_ptr_1_args(
                     async_task2,
                     &__rtic_internal_async_task2_EXEC,
@@ -1013,34 +975,22 @@ pub mod app {
                         &__rtic_internal_async_task2_EXEC,
                     );
                     exec.set_pending();
-                    rtic::export::pend(stm32f3xx_hal_v2::pac::interrupt::TIM3);
-                });
-            },
-        );
-    }
-    #[allow(non_snake_case)]
-    ///Interrupt handler to dispatch async tasks at priority 5
-    #[no_mangle]
-    unsafe fn TIM4() {
-        /// The priority of this interrupt handler
-        const PRIORITY: u8 = 5u8;
-        rtic::export::run(
-            PRIORITY,
-            || {
-                let exec = rtic::export::executor::AsyncTaskExecutor::from_ptr_1_args(
-                    async_task3,
-                    &__rtic_internal_async_task3_EXEC,
-                );
-                exec.poll(|| {
-                    let exec = rtic::export::executor::AsyncTaskExecutor::from_ptr_1_args(
-                        async_task3,
-                        &__rtic_internal_async_task3_EXEC,
-                    );
-                    exec.set_pending();
                     rtic::export::pend(stm32f3xx_hal_v2::pac::interrupt::TIM4);
                 });
             },
         );
+        unsafe{asm!("NOP");}
+        unsafe{asm!("add	sp, #40	");}
+        unsafe{asm!("add	sp, #4");}
+        unsafe{asm!("pop	{{r4, r5, r6, r7}}");}
+        unsafe{asm!("add	sp, #4");}
+        unsafe{asm!("POP {{r0, r1, r2,r3}}");}
+        unsafe{asm!("POP {{r12, lr}}");}
+        unsafe{asm!("POP {{r0}}");}
+        unsafe{asm!("add	sp, #4");}
+        unsafe{asm!("mov pc, r0");}
+    //    // unsafe{asm!("POP {{r0, r1, r2,r3, pc,lr}}");}
+
     }
     #[doc(hidden)]
     #[no_mangle]
@@ -1055,46 +1005,6 @@ pub mod app {
             {
                 // ::core::panicking::panic_fmt(
                 //     format_args!(
-                //         "Maximum priority used by interrupt vector \'TIM2\' is more than supported by hardware",
-                //     ),
-                // );
-            };
-        };
-        core.NVIC
-            .set_priority(
-                you_must_enable_the_rt_feature_for_the_pac_in_your_cargo_toml::interrupt::TIM2,
-                rtic::export::cortex_logical2hw(
-                    3u8,
-                    stm32f3xx_hal_v2::pac::NVIC_PRIO_BITS,
-                ),
-            );
-        rtic::export::NVIC::unmask(
-            you_must_enable_the_rt_feature_for_the_pac_in_your_cargo_toml::interrupt::TIM2,
-        );
-        const _: () = if (1 << stm32f3xx_hal_v2::pac::NVIC_PRIO_BITS) < 4u8 as usize {
-            {
-                // ::core::panicking::panic_fmt(
-                //     format_args!(
-                //         "Maximum priority used by interrupt vector \'TIM3\' is more than supported by hardware",
-                //     ),
-                // );
-            };
-        };
-        core.NVIC
-            .set_priority(
-                you_must_enable_the_rt_feature_for_the_pac_in_your_cargo_toml::interrupt::TIM3,
-                rtic::export::cortex_logical2hw(
-                    4u8,
-                    stm32f3xx_hal_v2::pac::NVIC_PRIO_BITS,
-                ),
-            );
-        rtic::export::NVIC::unmask(
-            you_must_enable_the_rt_feature_for_the_pac_in_your_cargo_toml::interrupt::TIM3,
-        );
-        const _: () = if (1 << stm32f3xx_hal_v2::pac::NVIC_PRIO_BITS) < 5u8 as usize {
-            {
-                // ::core::panicking::panic_fmt(
-                //     format_args!(
                 //         "Maximum priority used by interrupt vector \'TIM4\' is more than supported by hardware",
                 //     ),
                 // );
@@ -1104,7 +1014,7 @@ pub mod app {
             .set_priority(
                 you_must_enable_the_rt_feature_for_the_pac_in_your_cargo_toml::interrupt::TIM4,
                 rtic::export::cortex_logical2hw(
-                    5u8,
+                    3u8,
                     stm32f3xx_hal_v2::pac::NVIC_PRIO_BITS,
                 ),
             );
@@ -1129,11 +1039,6 @@ pub mod app {
         );
         executors_size += ::core::mem::size_of_val(&executor);
         __rtic_internal_async_task2_EXEC.set_in_main(&executor);
-        let executor = ::core::mem::ManuallyDrop::new(
-            rtic::export::executor::AsyncTaskExecutor::new_1_args(async_task3),
-        );
-        executors_size += ::core::mem::size_of_val(&executor);
-        __rtic_internal_async_task3_EXEC.set_in_main(&executor);
         extern "C" {
             pub static _stack_start: u32;
             pub static __ebss: u32;

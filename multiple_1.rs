@@ -8,7 +8,7 @@
 use core::prelude::rust_2021::*;
 #[macro_use]
 extern crate core;
-//extern crate compiler_builtins as _;
+extern crate compiler_builtins as _;
 use test_app as _;
 use stm32f3xx_hal_v2::pac::Interrupt;
 use cortex_m::peripheral::NVIC;
@@ -695,7 +695,7 @@ pub mod app {
     };
     use crate::checkpoint::my_flash::{
         unlock, wait_ready, clear_error_flags, erase_page, write_to_flash,
-    };  
+    };
     use cortex_m::peripheral::syst::SystClkSource;
     use cortex_m_rt::exception;
     use stm32f3xx_hal_v2::{
@@ -1053,11 +1053,11 @@ pub mod app {
         let _ = you_must_enable_the_rt_feature_for_the_pac_in_your_cargo_toml::interrupt::TIM4;
         const _: () = if (1 << stm32f3xx_hal_v2::pac::NVIC_PRIO_BITS) < 3u8 as usize {
             {
-                // ::core::panicking::panic_fmt(
-                //     format_args!(
-                //         "Maximum priority used by interrupt vector \'TIM2\' is more than supported by hardware",
-                //     ),
-                // );
+                ::core::panicking::panic_fmt(
+                    format_args!(
+                        "Maximum priority used by interrupt vector \'TIM2\' is more than supported by hardware",
+                    ),
+                );
             };
         };
         core.NVIC
@@ -1073,11 +1073,11 @@ pub mod app {
         );
         const _: () = if (1 << stm32f3xx_hal_v2::pac::NVIC_PRIO_BITS) < 4u8 as usize {
             {
-                // ::core::panicking::panic_fmt(
-                //     format_args!(
-                //         "Maximum priority used by interrupt vector \'TIM3\' is more than supported by hardware",
-                //     ),
-                // );
+                ::core::panicking::panic_fmt(
+                    format_args!(
+                        "Maximum priority used by interrupt vector \'TIM3\' is more than supported by hardware",
+                    ),
+                );
             };
         };
         core.NVIC
@@ -1093,11 +1093,11 @@ pub mod app {
         );
         const _: () = if (1 << stm32f3xx_hal_v2::pac::NVIC_PRIO_BITS) < 5u8 as usize {
             {
-                // ::core::panicking::panic_fmt(
-                //     format_args!(
-                //         "Maximum priority used by interrupt vector \'TIM4\' is more than supported by hardware",
-                //     ),
-                // );
+                ::core::panicking::panic_fmt(
+                    format_args!(
+                        "Maximum priority used by interrupt vector \'TIM4\' is more than supported by hardware",
+                    ),
+                );
             };
         };
         core.NVIC
@@ -1143,9 +1143,9 @@ pub mod app {
         if stack_start > ebss {
             if rtic::export::msp::read() <= ebss {
                 {
-                    // ::core::panicking::panic_fmt(
-                    //     format_args!("Stack overflow after allocating executors"),
-                    // );
+                    ::core::panicking::panic_fmt(
+                        format_args!("Stack overflow after allocating executors"),
+                    );
                 };
             }
         }

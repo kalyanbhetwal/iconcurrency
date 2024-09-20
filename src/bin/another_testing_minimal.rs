@@ -670,8 +670,6 @@ use checkpoint::{
     counter, start_atomic, end_atomic,
 };
 use volatile::Volatile;
-use cortex_m::peripheral::syst::SystClkSource;
-use cortex_m_rt::{entry, exception};
 use checkpoint::my_flash::{
     unlock, wait_ready, clear_error_flags, erase_page, write_to_flash,
 };
@@ -695,29 +693,12 @@ pub mod app {
     };
     use crate::checkpoint::my_flash::{
         unlock, wait_ready, clear_error_flags, erase_page, write_to_flash,
-    };  
-    use cortex_m::peripheral::syst::SystClkSource;
-    use cortex_m_rt::exception;
+    };
     use stm32f3xx_hal_v2::{
         pac::{self, NVIC},
         pac::Peripherals, pac::FLASH, pac::Interrupt, gpio::{gpioa::PA0, Input, PullUp},
     };
     use volatile::Volatile;
-    #[doc(hidden)]
-    #[export_name = "SysTick"]
-    pub unsafe extern "C" fn __cortex_m_rt_SysTick_trampoline() {
-        __cortex_m_rt_SysTick()
-    }
-    fn __cortex_m_rt_SysTick() {
-        {
-            extern crate cortex_m_rt;
-            cortex_m_rt::Exception::SysTick;
-        }
-        let p = cortex_m::Peripherals::take().unwrap();
-        let mut syst = p.SYST;
-        syst.disable_counter();
-        restore();
-    }
     /// User code end
     ///Shared resources
     struct Shared {}
@@ -764,13 +745,7 @@ pub mod app {
     #[allow(non_snake_case)]
     fn init(ctx: init::Context) -> (Shared, Local) {
         //delete_all_pg();
-        let p = cortex_m::Peripherals::take().unwrap();
-        let mut syst = p.SYST;
-        syst.set_clock_source(SystClkSource::Core);
-        syst.set_reload(12_000_000);
-        syst.clear_current();
-        syst.enable_counter();
-        syst.enable_interrupt();
+        //restore();
         ::cortex_m_semihosting::export::hstdout_str("init\n");
         async_task1::spawn().ok();
         async_task2::spawn().ok();
@@ -945,6 +920,7 @@ pub mod app {
         use rtic::Mutex as _;
         use rtic::mutex::prelude::*;
         ::cortex_m_semihosting::export::hstdout_str("I am in task1 before cp\n");
+        //c_checkpoint(false);
         ::cortex_m_semihosting::export::hstdout_str("I am in task1 after cp\n");
     }
     #[allow(non_snake_case)]
@@ -953,16 +929,13 @@ pub mod app {
         use rtic::mutex::prelude::*;
         ::cortex_m_semihosting::export::hstdout_str("I am in task2\n");
         async_task3::spawn().ok();
-        ::cortex_m_semihosting::export::hstdout_str("I am doing more operation\n");
+        ::cortex_m_semihosting::export::hstdout_str("I am doing more operation 2\n");
     }
     #[allow(non_snake_case)]
     async fn async_task3<'a>(mut cx: async_task3::Context<'a>) {
         use rtic::Mutex as _;
         use rtic::mutex::prelude::*;
-        unsafe {
-            asm!("NOP");
-        }
-        ::cortex_m_semihosting::export::hstdout_str("I am doing more operation 3\n");
+           ::cortex_m_semihosting::export::hstdout_str("I am doing more operation 3\n");
     }
     #[allow(non_upper_case_globals)]
     static __rtic_internal_async_task1_EXEC: rtic::export::executor::AsyncTaskExecutorPtr = rtic::export::executor::AsyncTaskExecutorPtr::new();
@@ -993,6 +966,7 @@ pub mod app {
                 });
             },
         );
+        unsafe {  asm!("NOP");}
     }
     #[allow(non_snake_case)]
     ///Interrupt handler to dispatch async tasks at priority 4
@@ -1017,6 +991,7 @@ pub mod app {
                 });
             },
         );
+        unsafe {   asm!("NOP"); }
     }
     #[allow(non_snake_case)]
     ///Interrupt handler to dispatch async tasks at priority 5
@@ -1041,6 +1016,7 @@ pub mod app {
                 });
             },
         );
+        unsafe { asm!("NOP"); }
     }
     #[doc(hidden)]
     #[no_mangle]

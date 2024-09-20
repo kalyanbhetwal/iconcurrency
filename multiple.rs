@@ -8,7 +8,7 @@
 use core::prelude::rust_2021::*;
 #[macro_use]
 extern crate core;
-//extern crate compiler_builtins as _;
+extern crate compiler_builtins as _;
 use test_app as _;
 use stm32f3xx_hal_v2::pac::Interrupt;
 use cortex_m::peripheral::NVIC;
@@ -670,8 +670,6 @@ use checkpoint::{
     counter, start_atomic, end_atomic,
 };
 use volatile::Volatile;
-use cortex_m::peripheral::syst::SystClkSource;
-use cortex_m_rt::{entry, exception};
 use checkpoint::my_flash::{
     unlock, wait_ready, clear_error_flags, erase_page, write_to_flash,
 };
@@ -695,29 +693,12 @@ pub mod app {
     };
     use crate::checkpoint::my_flash::{
         unlock, wait_ready, clear_error_flags, erase_page, write_to_flash,
-    };  
-    use cortex_m::peripheral::syst::SystClkSource;
-    use cortex_m_rt::exception;
+    };
     use stm32f3xx_hal_v2::{
         pac::{self, NVIC},
         pac::Peripherals, pac::FLASH, pac::Interrupt, gpio::{gpioa::PA0, Input, PullUp},
     };
     use volatile::Volatile;
-    #[doc(hidden)]
-    #[export_name = "SysTick"]
-    pub unsafe extern "C" fn __cortex_m_rt_SysTick_trampoline() {
-        __cortex_m_rt_SysTick()
-    }
-    fn __cortex_m_rt_SysTick() {
-        {
-            extern crate cortex_m_rt;
-            cortex_m_rt::Exception::SysTick;
-        }
-        let p = cortex_m::Peripherals::take().unwrap();
-        let mut syst = p.SYST;
-        syst.disable_counter();
-        restore();
-    }
     /// User code end
     ///Shared resources
     struct Shared {}
@@ -763,14 +744,8 @@ pub mod app {
     #[inline(always)]
     #[allow(non_snake_case)]
     fn init(ctx: init::Context) -> (Shared, Local) {
-        //delete_all_pg();
-        let p = cortex_m::Peripherals::take().unwrap();
-        let mut syst = p.SYST;
-        syst.set_clock_source(SystClkSource::Core);
-        syst.set_reload(12_000_000);
-        syst.clear_current();
-        syst.enable_counter();
-        syst.enable_interrupt();
+        delete_all_pg();
+        restore();
         ::cortex_m_semihosting::export::hstdout_str("init\n");
         async_task1::spawn().ok();
         async_task2::spawn().ok();
@@ -945,6 +920,7 @@ pub mod app {
         use rtic::Mutex as _;
         use rtic::mutex::prelude::*;
         ::cortex_m_semihosting::export::hstdout_str("I am in task1 before cp\n");
+        c_checkpoint(false);
         ::cortex_m_semihosting::export::hstdout_str("I am in task1 after cp\n");
     }
     #[allow(non_snake_case)]
@@ -952,8 +928,9 @@ pub mod app {
         use rtic::Mutex as _;
         use rtic::mutex::prelude::*;
         ::cortex_m_semihosting::export::hstdout_str("I am in task2\n");
-        async_task3::spawn().ok();
         ::cortex_m_semihosting::export::hstdout_str("I am doing more operation\n");
+        ::cortex_m_semihosting::export::hstdout_str("I am doing more operation 3\n");
+        async_task3::spawn().ok();
     }
     #[allow(non_snake_case)]
     async fn async_task3<'a>(mut cx: async_task3::Context<'a>) {
@@ -962,7 +939,6 @@ pub mod app {
         unsafe {
             asm!("NOP");
         }
-        ::cortex_m_semihosting::export::hstdout_str("I am doing more operation 3\n");
     }
     #[allow(non_upper_case_globals)]
     static __rtic_internal_async_task1_EXEC: rtic::export::executor::AsyncTaskExecutorPtr = rtic::export::executor::AsyncTaskExecutorPtr::new();
@@ -1053,11 +1029,11 @@ pub mod app {
         let _ = you_must_enable_the_rt_feature_for_the_pac_in_your_cargo_toml::interrupt::TIM4;
         const _: () = if (1 << stm32f3xx_hal_v2::pac::NVIC_PRIO_BITS) < 3u8 as usize {
             {
-                // ::core::panicking::panic_fmt(
-                //     format_args!(
-                //         "Maximum priority used by interrupt vector \'TIM2\' is more than supported by hardware",
-                //     ),
-                // );
+                ::core::panicking::panic_fmt(
+                    format_args!(
+                        "Maximum priority used by interrupt vector \'TIM2\' is more than supported by hardware",
+                    ),
+                );
             };
         };
         core.NVIC
@@ -1073,11 +1049,11 @@ pub mod app {
         );
         const _: () = if (1 << stm32f3xx_hal_v2::pac::NVIC_PRIO_BITS) < 4u8 as usize {
             {
-                // ::core::panicking::panic_fmt(
-                //     format_args!(
-                //         "Maximum priority used by interrupt vector \'TIM3\' is more than supported by hardware",
-                //     ),
-                // );
+                ::core::panicking::panic_fmt(
+                    format_args!(
+                        "Maximum priority used by interrupt vector \'TIM3\' is more than supported by hardware",
+                    ),
+                );
             };
         };
         core.NVIC
@@ -1093,11 +1069,11 @@ pub mod app {
         );
         const _: () = if (1 << stm32f3xx_hal_v2::pac::NVIC_PRIO_BITS) < 5u8 as usize {
             {
-                // ::core::panicking::panic_fmt(
-                //     format_args!(
-                //         "Maximum priority used by interrupt vector \'TIM4\' is more than supported by hardware",
-                //     ),
-                // );
+                ::core::panicking::panic_fmt(
+                    format_args!(
+                        "Maximum priority used by interrupt vector \'TIM4\' is more than supported by hardware",
+                    ),
+                );
             };
         };
         core.NVIC
@@ -1143,9 +1119,9 @@ pub mod app {
         if stack_start > ebss {
             if rtic::export::msp::read() <= ebss {
                 {
-                    // ::core::panicking::panic_fmt(
-                    //     format_args!("Stack overflow after allocating executors"),
-                    // );
+                    ::core::panicking::panic_fmt(
+                        format_args!("Stack overflow after allocating executors"),
+                    );
                 };
             }
         }

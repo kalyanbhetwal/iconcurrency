@@ -13,7 +13,8 @@ use cortex_m::peripheral::NVIC;
 mod checkpoint;
 use checkpoint::{checkpoint, restore, delete_pg, delete_all_pg, transcation_log, execution_mode, counter,start_atomic, end_atomic};
 use volatile::Volatile;
-
+use cortex_m::peripheral::syst::SystClkSource;
+use cortex_m_rt::{entry, exception};
 use checkpoint::my_flash::{unlock, wait_ready, clear_error_flags, erase_page, write_to_flash};
 
 #[rtic::app(device = stm32f3xx_hal_v2::pac, dispatchers = [TIM2, TIM3, TIM4])]
@@ -28,6 +29,8 @@ mod app {
     use crate::checkpoint::save_variables;
     use crate::checkpoint::{self, delete_all_pg, restore, checkpoint,c_checkpoint, erase_all};
     use crate::checkpoint::my_flash::{unlock, wait_ready, clear_error_flags, erase_page, write_to_flash};
+    use cortex_m::peripheral::syst::SystClkSource;
+    use cortex_m_rt:: exception;
 
     use stm32f3xx_hal_v2::{pac::{self, NVIC},pac::Peripherals, pac::FLASH, pac::Interrupt, gpio::{gpioa::PA0,Input, PullUp}};
     use volatile::Volatile;
@@ -68,8 +71,19 @@ mod app {
         //unsafe{NVIC::unmask(Interrupt::EXTI0)};
         
         // Enable EXTI0 interrupt in the NVIC
-        delete_all_pg(); 
-        restore();
+        //delete_all_pg(); 
+
+        let p = cortex_m::Peripherals::take().unwrap();
+        let mut syst = p.SYST;
+    
+        // configures the system timer to trigger a SysTick exception every second
+        syst.set_clock_source(SystClkSource::Core);
+        // this is configured for the LM3S6965 which has a default CPU clock of 12 MHz
+        syst.set_reload(12_000_000);
+        syst.clear_current();
+        syst.enable_counter();
+        syst.enable_interrupt();
+    
         //update_regs();
         // c_checkpoint::spawn(true).ok();
         hprintln!("init");
@@ -125,7 +139,7 @@ mod app {
         //async_task2::spawn().ok();
         //start_atomic();
         hprintln!("I am in task1 before cp");
-        c_checkpoint(false);// unsafe{asm!("nop")};//
+        //c_checkpoint(false);// unsafe{asm!("nop")};//
         hprintln!("I am in task1 after cp");
         //end_atomic();
         // hprintln!(
@@ -140,11 +154,9 @@ mod app {
     #[task(priority = 4)]
     async fn async_task2(mut cx: async_task2::Context) {
         hprintln!("I am in task2");
-        hprintln!("I am doing more operation");
-        hprintln!("I am doing more operation 3");
-
         //c_checkpoint(false);
         async_task3::spawn().ok();
+        hprintln!("I am doing more operation");
 
         // hprintln!(
         //     "hello from async 2 a {}",
@@ -158,6 +170,7 @@ mod app {
     #[task(priority = 5)]
     async fn async_task3(mut cx: async_task3::Context) {
         unsafe{asm!("NOP");}
+        hprintln!("I am doing more operation 3");
         // hprintln!(
         //     "hello from async 3 a {}",
         //     cx.shared.a.lock(|a| {
@@ -167,4 +180,12 @@ mod app {
         // );
     }
     //fn restore(){}
+
+    #[exception]
+    fn SysTick() {
+        let p = cortex_m::Peripherals::take().unwrap();
+        let mut syst = p.SYST;
+        syst.disable_counter();
+        restore();
+    }
 }
