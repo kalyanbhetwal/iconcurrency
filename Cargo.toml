@@ -12,7 +12,6 @@ panic-halt = "0.2.0"
 cortex-m = { version = "0.7", features = ["critical-section-single-core"] }
 defmt = { version = "0.3", features = ["encoding-rzcobs"] }
 defmt-brtt = { version = "0.1", default-features = false, features = ["rtt"] }
-flip-link = "0.1.8"
 panic-probe = { version = "0.3", features = ["print-defmt"] }
 # TODO(4) Select the correct rtic backend
 rtic = { path="/Users/kb/Documents/intermittentC/my_rtic/rtic/rtic", features = [ "thumbv7-backend" ] }

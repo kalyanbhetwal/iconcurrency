@@ -929,7 +929,6 @@ pub mod app {
     async fn async_task1<'a>(mut cx: async_task1::Context<'a>, inc: u32) {
         use rtic::Mutex as _;
         use rtic::mutex::prelude::*;
-        let mut xyz = 1;
         cx.shared
             .a
             .lock(|a| {
@@ -938,9 +937,9 @@ pub mod app {
         ::cortex_m_semihosting::export::hstdout_fmt(
             format_args!("hello from async 1 a {0}\n", cx.shared.a.lock(|a| { *a })),
         );
+        static mut xyz: i32 = 1;
         start_atomic();
-        xyz += 1;
-        xyz = xyz * 2;
+        unsafe { xyz = xyz + 2 };
         end_atomic();
     }
     #[allow(non_snake_case)]

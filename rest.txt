@@ -929,7 +929,6 @@ pub mod app {
     async fn async_task1<'a>(mut cx: async_task1::Context<'a>, inc: u32) {
         use rtic::Mutex as _;
         use rtic::mutex::prelude::*;
-        let mut xyz = 1;
         cx.shared
             .a
             .lock(|a| {
@@ -939,6 +938,7 @@ pub mod app {
             format_args!("hello from async 1 a {0}\n", cx.shared.a.lock(|a| { *a })),
         );
         start_atomic();
+        let mut xyz = 1;
         xyz += 1;
         xyz = xyz * 2;
         end_atomic();
