@@ -3,13 +3,13 @@ stmts --x-- * a += inc;
 writes and reads before extract
 reads_ {"*a", "inc"}
 wrties_ {"*a"}
-the stmt "unsafe\n{ save_variables(& (* a) as * const _, core :: mem :: size_of_val(& (* a))); }"
+the stmt "save_variables(& (* a) as * const _, core :: mem :: size_of_val(& (* a)));"
 I found lock
 stmts --x-- * a += 1;
 writes and reads before extract
 reads_ {"*a"}
 wrties_ {"*a"}
-the stmt "unsafe\n{ save_variables(& (* a) as * const _, core :: mem :: size_of_val(& (* a))); }"
+the stmt "save_variables(& (* a) as * const _, core :: mem :: size_of_val(& (* a)));"
 #![feature(prelude_import)]
 //! examples/spawn_loop.rs
 #![no_main]
@@ -951,10 +951,8 @@ pub mod app {
         cx.shared
             .a
             .lock(|a| {
+                save_variables(&(*a) as *const _, core::mem::size_of_val(&(*a)));
                 *a += inc;
-                unsafe {
-                    save_variables(&(*a) as *const _, core::mem::size_of_val(&(*a)));
-                }
             });
         ::cortex_m_semihosting::export::hstdout_fmt(
             format_args!("hello from async 1 a {0}\n", cx.shared.a.lock(|a| { *a })),
@@ -974,10 +972,8 @@ pub mod app {
         cx.shared
             .a
             .lock(|a| {
+                save_variables(&(*a) as *const _, core::mem::size_of_val(&(*a)));
                 *a += 1;
-                unsafe {
-                    save_variables(&(*a) as *const _, core::mem::size_of_val(&(*a)));
-                }
             });
         ::cortex_m_semihosting::export::hstdout_fmt(
             format_args!("hello from async 2 a {0}\n", cx.shared.a.lock(|a| { *a })),
