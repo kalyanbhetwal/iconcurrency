@@ -1,6 +1,8 @@
 I found lock
+stmts * a += inc;
 test "{ * a += inc; }"
 I found lock
+stmts * a += 1;
 test "{ * a += 1; }"
 #![feature(prelude_import)]
 //! examples/spawn_loop.rs
@@ -943,7 +945,7 @@ pub mod app {
         cx.shared
             .a
             .lock(|a| {
-                let x = 42;
+                save_variables(a as *const _, core::mem::size_of_val(a));
                 *a += inc;
             });
         ::cortex_m_semihosting::export::hstdout_fmt(
@@ -964,7 +966,7 @@ pub mod app {
         cx.shared
             .a
             .lock(|a| {
-                let x = 42;
+                save_variables(a as *const _, core::mem::size_of_val(a));
                 *a += 1;
             });
         ::cortex_m_semihosting::export::hstdout_fmt(
