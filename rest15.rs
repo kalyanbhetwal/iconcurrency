@@ -1,3 +1,15 @@
+I found lock
+stmts --x-- * a += inc;
+writes and reads before extract
+reads_ {"inc", "*a"}
+wrties_ {"*a"}
+the stmt "save_variables(& (* a) as * const _, core :: mem :: size_of_val(& (* a)));"
+I found lock
+stmts --x-- * a += 1;
+writes and reads before extract
+reads_ {"*a"}
+wrties_ {"*a"}
+the stmt "save_variables(& (* a) as * const _, core :: mem :: size_of_val(& (* a)));"
 #![feature(prelude_import)]
 //! examples/spawn_loop.rs
 #![no_main]
@@ -754,6 +766,13 @@ pub mod app {
         ::cortex_m_semihosting::export::hstdout_str("init\n");
         async_task1::spawn(1).ok();
         async_task2::spawn().ok();
+        static mut a: i32 = 1;
+        start_atomic();
+        unsafe {
+            save_variables(&a as *const _, core::mem::size_of_val(&a));
+        }
+        unsafe { a = a + 2 };
+        end_atomic();
         (Shared { a: 0, b: 0 }, Local {})
     }
     /// Execution context
@@ -929,18 +948,16 @@ pub mod app {
     async fn async_task1<'a>(mut cx: async_task1::Context<'a>, inc: u32) {
         use rtic::Mutex as _;
         use rtic::mutex::prelude::*;
-        let mut xyz = 1;
+        start_atomic();
         cx.shared
             .a
             .lock(|a| {
+                save_variables(&(*a) as *const _, core::mem::size_of_val(&(*a)));
                 *a += inc;
             });
         ::cortex_m_semihosting::export::hstdout_fmt(
             format_args!("hello from async 1 a {0}\n", cx.shared.a.lock(|a| { *a })),
         );
-        start_atomic();
-        xyz += 1;
-        xyz = xyz * 2;
         end_atomic();
     }
     #[allow(non_snake_case)]
@@ -950,6 +967,7 @@ pub mod app {
         cx.shared
             .a
             .lock(|a| {
+                save_variables(&(*a) as *const _, core::mem::size_of_val(&(*a)));
                 *a += 1;
             });
         ::cortex_m_semihosting::export::hstdout_fmt(
@@ -1954,13 +1972,6 @@ pub mod app {
         ::cortex_m_semihosting::export::hstdout_str("init\n");
         async_task1::spawn(1).ok();
         async_task2::spawn().ok();
-        static mut a: i32 = 1;
-        start_atomic();
-        unsafe {
-            save_variables(&a as *const _, core::mem::size_of_val(&a));
-        }
-        unsafe { a = a + 2 };
-        end_atomic();
         (Shared { a: 0, b: 0 }, Local {})
     }
     /// Execution context
@@ -2152,6 +2163,7 @@ pub mod app {
     async fn async_task2<'a>(mut cx: async_task2::Context<'a>) {
         use rtic::Mutex as _;
         use rtic::mutex::prelude::*;
+        start_atomic();
         cx.shared
             .a
             .lock(|a| {
@@ -2161,6 +2173,7 @@ pub mod app {
         ::cortex_m_semihosting::export::hstdout_fmt(
             format_args!("hello from async 2 a {0}\n", cx.shared.a.lock(|a| { *a })),
         );
+        end_atomic();
     }
     #[allow(non_camel_case_types)]
     #[allow(non_upper_case_globals)]

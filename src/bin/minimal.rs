@@ -50,12 +50,7 @@ mod app {
         hprintln!("init");
 
         async_task1::spawn(1).ok();
-        async_task2::spawn().ok();
 
-        static mut a:i32 = 1;
-        start_atomic();
-        unsafe{a = a + 2};
-        end_atomic();
         (Shared { a: 0, b: 0 }, Local {})
     }
 
@@ -70,19 +65,21 @@ mod app {
     #[task(priority = 1, shared = [a, b])]
     async fn async_task1(mut cx: async_task1::Context, inc: u32) {
         //let mut xyz= 1;
+        start_atomic();
+        async_task2::spawn().ok();
         cx.shared.a.lock(|a| {  *a += inc;});
         hprintln!(
             "hello from async 1 a {}", cx.shared.a.lock(|a|{*a}));
-        static mut abc:i32 = 1;
-        start_atomic();
-        unsafe{abc = abc + 2};
+        
         end_atomic();
     }
 
     #[task(priority = 2, shared = [a, b])]
     async fn async_task2(mut cx: async_task2::Context) {
+        start_atomic();
         cx.shared.a.lock(|a| {*a += 1;});
         hprintln!(
             "hello from async 2 a {}", cx.shared.a.lock(|a|{*a}));
+        end_atomic();
     }
 }
