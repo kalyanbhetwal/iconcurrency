@@ -17,25 +17,358 @@ pub static mut execution_mode: bool = true;  //1. true is jit 2.flase is static
 pub static mut counter: *mut u8= 0x60003002 as *mut u8;
 
 
+pub fn initialization(){
+    unsafe {
+    let dp  = Peripherals::steal();
+    
+     //enable HSI
+    dp.RCC.cr.write(|w| w.hsion().set_bit());
+    while dp.RCC.cr.read().hsirdy().bit_is_clear() {}
+ 
+     //configure PLL
+     // Step 1: Disable the PLL by setting PLLON to 0
+     dp.RCC.cr.modify(|_r, w| w.pllon().clear_bit());
+ 
+     // Step 2: Wait until PLLRDY is cleared
+     while dp.RCC.cr.read().pllrdy().bit_is_set() {}
+ 
+     // Step 3: Change the desired parameter
+     // For example, modify PLL multiplier (PLLMUL)
+ 
+     dp.RCC.cfgr.modify(|_, w| w.pllsrc().hsi_div_prediv());
+ 
+     // Set PLL Prediv to /1
+     dp.RCC.cfgr2.modify(|_, w| w.prediv().div1());
+ 
+     // Set PLL MUL to x9
+     dp.RCC.cfgr.modify(|_, w| w.pllmul().mul9());
+ 
+     // Step 4: Enable the PLL again by setting PLLON to 1
+    // dp.RCC.cr.modify(|_r, w| w.pllon().set_bit());
+ 
+     dp.RCC.cr.modify(|_, w| w.pllon().on());
+ 
+     while dp.RCC.cr.read().pllrdy().bit_is_clear(){}
+ 
+        // Configure prescalar values for HCLK, PCLK1, and PCLK2
+    dp.RCC.cfgr.modify(|_, w| {
+         w.hpre().div1() // HCLK prescaler: no division
+         .ppre1().div2() // PCLK1 prescaler: divide by 2
+         .ppre2().div1() // PCLK2 prescaler: no division
+     });
+ 
+ 
+     // Enable FLASH Prefetch Buffer and set Flash Latency (required for high speed)
+     // was crashing just because this was missing
+     dp.FLASH.acr
+         .modify(|_, w| w.prftbe().enabled().latency().ws1());
+ 
+      // Select PLL as system clock source
+      dp.RCC.cfgr.modify(|_, w| w.sw().pll());
+ 
+      while dp.RCC.cfgr.read().sw().bits() != 0b10 {}
+ 
+       // Wait for system clock to stabilize
+       while dp.RCC.cfgr.read().sws().bits() != 0b10 {}
+ 
+    //   dp.RCC.ahbenr.modify(|_, w| w.iopden().set_bit());
+    //   dp.RCC.ahbenr.modify(|_, w| w.iopeen().set_bit());
+    //   dp.RCC.ahbenr.modify(|_, w| w.iopfen().set_bit());
+    //   dp.RCC.ahbenr.modify(|_, w| w.iopgen().set_bit());
+    //   dp.RCC.ahbenr.modify(|_, w| w.iophen().set_bit());  
+    //   dp.RCC.ahbenr.modify(|_, w| w.sramen().set_bit());  
+    //   dp.RCC.ahbenr.modify(|_, w| w.flitfen().set_bit());  
+    //   dp.RCC.ahbenr.modify(|_, w| w.fmcen().set_bit());  
+
+    dp.RCC.ahbenr.modify(|_, w| w.iopden().set_bit());
+    dp.RCC.ahbenr.modify(|_, w| w.iopeen().set_bit());
+    dp.RCC.ahbenr.modify(|_, w| w.iopfen().set_bit());
+    dp.RCC.ahbenr.modify(|_, w| w.iopgen().set_bit());
+    dp.RCC.ahbenr.modify(|_, w| w.iophen().set_bit());  
+    dp.RCC.ahbenr.modify(|_, w| w.sramen().set_bit());  
+    dp.RCC.ahbenr.modify(|_, w| w.flitfen().set_bit());  
+    dp.RCC.ahbenr.modify(|_, w| w.fmcen().set_bit());  
+
+
+    dp.RCC.apb2enr.modify(|_, w| w.syscfgen().set_bit());
+    dp.RCC.apb1enr.modify(|_, w| w.pwren().set_bit());
+
+  let mut gpiod = dp.GPIOD;
+  let mut gpioe = dp.GPIOE;
+  let mut gpiof = dp.GPIOF;
+  let mut gpiog = dp.GPIOG;
+  let mut gpioh = dp.GPIOH;
+
+  //    PH0   ------> FMC_A0
+    gpioh.moder.modify(|_, w| {w.moder0().alternate()});
+    gpioh.afrl.modify(|_, w| {  w.afrl0().af12()});
+    gpioh.ospeedr.modify(|_, w| w.ospeedr0().very_high_speed());
+
+// PH1   ------> FMC_A1
+    gpioh.moder.modify(|_, w| {w.moder1().alternate()});
+    gpioh.afrl.modify(|_, w| {  w.afrl1().af12()});
+    gpioh.ospeedr.modify(|_, w| w.ospeedr1().very_high_speed());
+
+//  PF2   ------> FMC_A2
+    gpiof.moder.modify(|_, w| {w.moder2().alternate()});
+    gpiof.afrl.modify(|_, w| {  w.afrl2().af12()});
+    gpiof.ospeedr.modify(|_, w| w.ospeedr2().very_high_speed());
+
+//   PF3   ------> FMC_A3
+    gpiof.moder.modify(|_, w| {w.moder3().alternate()});
+    gpiof.afrl.modify(|_, w| {  w.afrl3().af12()});
+    gpiof.ospeedr.modify(|_, w| w.ospeedr3().very_high_speed());
+
+    //   PF4   ------> FMC_A4
+    gpiof.moder.modify(|_, w| {w.moder4().alternate()});
+    gpiof.afrl.modify(|_, w| {  w.afrl4().af12()});
+    gpiof.ospeedr.modify(|_, w| w.ospeedr4().very_high_speed());
+
+// PF5   ------> FMC_A5
+    gpiof.moder.modify(|_, w| {w.moder5().alternate()});
+    gpiof.afrl.modify(|_, w| {  w.afrl5().af12()});
+    gpiof.ospeedr.modify(|_, w| w.ospeedr5().very_high_speed());
+
+
+    //    PF12   ------> FMC_A6
+    gpiof.moder.modify(|_, w| {w.moder12().alternate()});
+    gpiof.afrh.modify(|_, w| {  w.afrh12().af12()});
+    gpiof.ospeedr.modify(|_, w| w.ospeedr12().very_high_speed());
+
+//   PF13   ------> FMC_A7
+    gpiof.moder.modify(|_, w| {w.moder13().alternate()});
+    gpiof.afrh.modify(|_, w| {  w.afrh13().af12()});
+    gpiof.ospeedr.modify(|_, w| w.ospeedr13().very_high_speed());
+
+//   PF14   ------> FMC_A8
+    gpiof.moder.modify(|_, w| {w.moder14().alternate()});
+    gpiof.afrh.modify(|_, w| {  w.afrh14().af12()});
+    gpiof.ospeedr.modify(|_, w| w.ospeedr14().very_high_speed());
+
+    //PF15   ------> FMC_A9
+    gpiof.moder.modify(|_, w| {w.moder15().alternate()});
+    gpiof.afrh.modify(|_, w| {  w.afrh15().af12()});
+    gpiof.ospeedr.modify(|_, w| w.ospeedr15().very_high_speed());
+
+    // PG0   ------> FMC_A10
+    gpiog.moder.modify(|_, w| {w.moder0().alternate()});
+    gpiog.afrl.modify(|_, w| {  w.afrl0().af12()});
+    gpiog.ospeedr.modify(|_, w| w.ospeedr0().very_high_speed());
+
+    //  PG1   ------> FMC_A11
+    gpiog.moder.modify(|_, w| {w.moder1().alternate()});
+    gpiog.afrl.modify(|_, w| {  w.afrl1().af12()});
+    gpiog.ospeedr.modify(|_, w| w.ospeedr1().very_high_speed());
+
+    //  PG2   ------> FMC_A12
+    gpiog.moder.modify(|_, w| {w.moder2().alternate()});
+    gpiog.afrl.modify(|_, w| {  w.afrl2().af12()});
+    gpiog.ospeedr.modify(|_, w| w.ospeedr2().very_high_speed());
+
+    //    PG3   ------> FMC_A13
+    gpiog.moder.modify(|_, w| {w.moder3().alternate()});
+    gpiog.afrl.modify(|_, w| {  w.afrl3().af12()});
+    gpiog.ospeedr.modify(|_, w| w.ospeedr3().very_high_speed());
+
+    //   PG4   ------> FMC_A14
+    gpiog.moder.modify(|_, w| {w.moder4().alternate()});
+    gpiog.afrl.modify(|_, w| {  w.afrl4().af12()});
+    gpiog.ospeedr.modify(|_, w| w.ospeedr4().very_high_speed());
+
+    
+     //PG5   ------> FMC_A15
+     gpiog.moder.modify(|_, w| {w.moder5().alternate()});
+     gpiog.afrl.modify(|_, w| {  w.afrl5().af12()});
+     gpiog.ospeedr.modify(|_, w| w.ospeedr5().very_high_speed());
+
+
+     //  PD14   ------> FMC_D0
+    gpiod.moder.modify(|_, w| {w.moder14().alternate()});
+    gpiod.afrh.modify(|_, w| {  w.afrh14().af12()});
+    gpiod.ospeedr.modify(|_, w| w.ospeedr14().very_high_speed());
+
+    //  PD15   ------> FMC_D1
+    gpiod.moder.modify(|_, w| {w.moder15().alternate()});
+    gpiod.afrh.modify(|_, w| {  w.afrh15().af12()});
+    gpiod.ospeedr.modify(|_, w| w.ospeedr15().very_high_speed());
+
+    // PD0   ------> FMC_D2
+    gpiod.moder.modify(|_, w| {w.moder0().alternate()});
+    gpiod.afrl.modify(|_, w| {  w.afrl0().af12()});
+    gpiod.ospeedr.modify(|_, w| w.ospeedr0().very_high_speed());
+
+    // PD1   ------> FMC_D3
+    gpiod.moder.modify(|_, w| {w.moder1().alternate()});
+    gpiod.afrl.modify(|_, w| {  w.afrl1().af12()});
+    gpiod.ospeedr.modify(|_, w| w.ospeedr1().very_high_speed());
+
+    //PE7   ------> FMC_D4
+    gpioe.moder.modify(|_, w| {w.moder7().alternate()});
+    gpioe.afrl.modify(|_, w| {  w.afrl7().af12()});
+    gpioe.ospeedr.modify(|_, w| w.ospeedr7().very_high_speed());
+
+    //PE8   ------> FMC_D5
+    gpioe.moder.modify(|_, w| {w.moder8().alternate()});
+    gpioe.afrh.modify(|_, w| {  w.afrh8().af12()});
+    gpioe.ospeedr.modify(|_, w| w.ospeedr8().very_high_speed());
+
+    // PE9   ------> FMC_D6
+    gpioe.moder.modify(|_, w| {w.moder9().alternate()});
+    gpioe.afrh.modify(|_, w| {  w.afrh9().af12()});
+    gpioe.ospeedr.modify(|_, w| w.ospeedr9().very_high_speed());
+
+    //PE10   ------> FMC_D7
+    gpioe.moder.modify(|_, w| {w.moder10().alternate()});
+    gpioe.afrh.modify(|_, w| {  w.afrh10().af12()});
+    gpioe.ospeedr.modify(|_, w| w.ospeedr10().very_high_speed());
+
+    //PE11   ------> FMC_D8
+    gpioe.moder.modify(|_, w| {w.moder11().alternate()});
+    gpioe.afrh.modify(|_, w| {  w.afrh11().af12()});
+    gpioe.ospeedr.modify(|_, w| w.ospeedr11().very_high_speed());
+
+
+    //PE12   ------> FMC_D9
+    gpioe.moder.modify(|_, w| {w.moder12().alternate()});
+    gpioe.afrh.modify(|_, w| {  w.afrh12().af12()});
+    gpioe.ospeedr.modify(|_, w| w.ospeedr12().very_high_speed());
+
+    //PE13   ------> FMC_D10
+    gpioe.moder.modify(|_, w| {w.moder13().alternate()});
+    gpioe.afrh.modify(|_, w| {  w.afrh13().af12()});
+    gpioe.ospeedr.modify(|_, w| w.ospeedr13().very_high_speed());
+
+    //PE14   ------> FMC_D11
+    gpioe.moder.modify(|_, w| {w.moder14().alternate()});
+    gpioe.afrh.modify(|_, w| {  w.afrh14().af12()});
+    gpioe.ospeedr.modify(|_, w| w.ospeedr14().very_high_speed());
+
+    //PE15   ------> FMC_D12
+    gpioe.moder.modify(|_, w| {w.moder15().alternate()});
+    gpioe.afrh.modify(|_, w| {  w.afrh15().af12()});
+    gpioe.ospeedr.modify(|_, w| w.ospeedr15().very_high_speed());
+
+    //PD8   ------> FMC_D13
+    gpiod.moder.modify(|_, w| {w.moder8().alternate()});
+    gpiod.afrh.modify(|_, w| {  w.afrh8().af12()});
+    gpiod.ospeedr.modify(|_, w| w.ospeedr8().very_high_speed());
+
+    //PD9   ------> FMC_D14
+    gpiod.moder.modify(|_, w| {w.moder9().alternate()});
+    gpiod.afrh.modify(|_, w| {  w.afrh9().af12()});
+    gpiod.ospeedr.modify(|_, w| w.ospeedr9().very_high_speed());
+
+    //PD10   ------> FMC_D15
+    gpiod.moder.modify(|_, w| {w.moder10().alternate()});
+    gpiod.afrh.modify(|_, w| {  w.afrh10().af12()});
+    gpiod.ospeedr.modify(|_, w| w.ospeedr10().very_high_speed());
+
+
+    // PD4   ------> FMC_NOE
+    // PD5   ------> FMC_NWE
+    // PD7   ------> FMC_NE1
+
+    gpiod.moder.modify(|_, w| {w.moder7().alternate()});
+    gpiod.afrl.modify(|_, w| {  w.afrl7().af12()});
+    gpiod.ospeedr.modify(|_, w| w.ospeedr7().very_high_speed());
+
+
+    gpiod.moder.modify(|_, w| {w.moder4().alternate()});
+    gpiod.afrl.modify(|_, w| {  w.afrl4().af12()});
+    gpiod.ospeedr.modify(|_, w| w.ospeedr4().very_high_speed());
+
+
+    gpiod.moder.modify(|_, w| {w.moder5().alternate()});
+    gpiod.afrl.modify(|_, w| {  w.afrl5().af12()});
+    gpiod.ospeedr.modify(|_, w| w.ospeedr5().very_high_speed());
+
+
+   
+     // Configure FMC for SRAM memory(in our case F-RAM)
+    
+           dp.FMC.bcr1.modify(|_, w| {
+           w.mbken().set_bit(); // Enable FRAM bank 1
+           w.mtyp().bits(0b00); // FRAM memory type
+           w.mwid().bits(0b01); // 16-bit width
+           w.bursten().clear_bit(); //disable brust access mode
+           w.wren().clear_bit(); // wrap disable
+           w.muxen().clear_bit(); // Non-multiplexed
+           w.extmod().clear_bit(); // extended mode
+           w.asyncwait().clear_bit(); //disable async wait
+           w
+        });
+   
+        /*
+           Timing.AddressSetupTime = 1;
+           Timing.AddressHoldTime = 1;
+           Timing.DataSetupTime = 5;
+           Timing.BusTurnAroundDuration = 0;
+           Timing.CLKDivision = 0;
+           Timing.DataLatency = 0;
+           Timing.AccessMode = FMC_ACCESS_MODE_A;
+      */
+        dp.FMC.btr1.modify(|_,w|  {
+          // Set address setup time to 1 cycle
+           w.addset().bits(0x1);
+           // Set data setup time to 5 cycle
+           w.datast().bits(0x5);
+           // address hold time
+           w.addhld().bits(0x1);
+           // bus turn around
+           w.busturn().bits(0x0);
+           // clock division
+           w.clkdiv().bits(0x0);
+           //data latency
+           w.datlat().bits(0x0);
+           //access mode
+           w.accmod().bits(0x0);
+   
+           w
+       });
+   }
+}
+
+
 
 pub fn save_variables<T>(mem_loc: *const T, size: usize) {
     unsafe{
-        let mem_loc_u8 = mem_loc as *const u8;
-        for i in 0..4 {
-            let byte = (mem_loc_u8 as u32 >> (i * 8)) as u8; // Extract the byte at position i
-            hprintln!("bytes {:0x}", byte);
-            ptr::write((transcation_log+2 *i as u32) as *mut u8 , byte);
-        }
-        transcation_log += 2*4;
+        let mem_loc_u16 = mem_loc as *const u16;
+        hprintln!("address {:0x}", transcation_log);
+        // for i in 0..2 {
+        //     let byte = (mem_loc_u16 as u32 >> (i * 16)) as u16; // Extract the byte at position i
+        //     hprintln!("bytes {:0x}", byte);
+        //     ptr::write((transcation_log+(2 *i) ) as *mut u16 , byte);
+        //     let a =   ptr::read_volatile((transcation_log+ (2 *i) ) as *mut u16);
+        //     hprintln!("written {:0x}", a);
+        // }
+        let byte = (mem_loc_u16 as u32 >> (0 * 16)) as u16; // Extract the byte at position i
+        hprintln!("bytes {:0x}", byte);
+        ptr::write((transcation_log+(2 *0 )as u32) as *mut u16 , byte);
+        let a =   ptr::read_volatile((transcation_log+ 2 *0  as u32) as *mut u16);
+        hprintln!("written {:0x}", a);
 
-        ptr::write(transcation_log as *mut u8 , size as u8);
+        let byte = (mem_loc_u16 as u32 >> (1 * 16)) as u16; // Extract the byte at position i
+        hprintln!("bytes {:0x}", byte);
+        ptr::write((transcation_log+(2 *1) as u32) as *mut u16 , byte);
+        let a =   ptr::read_volatile((transcation_log+ 2 *1 as u32) as *mut u16);
+         hprintln!("written {:0x}", a);
+
+
+        transcation_log += 4;
+        hprintln!("the int t_log {:0x}", transcation_log);
+
+        ptr::write(transcation_log as *mut u16 , size as u16);
 
         transcation_log += 2*1; //adding 2 because of issues in fram where only even address are being written
 
-        for i in 0..size{
-            let byte = *mem_loc_u8.add(i); 
-            hprintln!("the logged byte {}", byte);
-            ptr::write( (transcation_log+2*i as u32) as *mut u8 , byte);   
+        hprintln!("the int t1_log {:0x}", transcation_log);
+
+        for i in 0..size/2{
+            let byte = *mem_loc_u16.add(i); 
+            hprintln!("the logged byte {:0x}", byte);
+            ptr::write( (transcation_log+(2*i as u32)) as *mut u16 , byte); 
+            let a =   ptr::read_volatile((transcation_log+ (2 *i as u32)) as *mut u16);
+            hprintln!("written? {:0x}", a);  
         }
         transcation_log =  transcation_log + 2*size as u32;
         *counter +=1;
@@ -388,19 +721,19 @@ pub fn restore_globals(){
             }
 
             let mut combined:u32 = 0;
-            for i in 0..4 {
-                combined |= (ptr::read((transcation_log + i) as *const u32) << (i * 8));
+            for i in 0..2 {
+                combined |= (ptr::read((transcation_log + i) as *const u32) << (i * 16));
             
             }
             
-            let mut size:u8 = ptr::read( transcation_log as *const u8);
+            let mut size:u16 = ptr::read( transcation_log as *const u16);
         
             for i in 0..size{
-                ptr::write((combined + i as u32) as *mut u8,*((transcation_log + i as u32) as *const u8));
+                ptr::write((combined + i as u32) as *mut u16,*((transcation_log + i as u32) as *const u16));
             }
             combined =  combined + size as u32;
 
-            let end = ptr::read(combined as *const u8);
+            let end = ptr::read(combined as *const u16);
             restore_ctr += 1;
 
   

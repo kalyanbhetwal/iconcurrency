@@ -35,11 +35,15 @@ mod app {
     use stm32f3xx_hal_v2::{pac::{self, NVIC},pac::Peripherals, pac::FLASH, pac::Interrupt, gpio::{gpioa::PA0,Input, PullUp}};
     use volatile::Volatile;
     use cortex_m_semihosting::{debug, hprintln};
+    use crate::checkpoint::initialization;
 
+    
     #[shared]
+    #[repr(C)]
+    #[link_section=".fram_section"]
     struct Shared {
-        a: u32,
-        b: u32,
+        a: u16,
+        b: u16,
     }
 
     #[local]
@@ -48,10 +52,10 @@ mod app {
     #[init]
     fn init(_: init::Context) -> (Shared, Local) {
         hprintln!("init");
-
+        initialization();
         async_task1::spawn(1).ok();
 
-        (Shared { a: 0, b: 0 }, Local {})
+        (Shared {a: 12, b: 3 }, Local {})
     }
 
     #[idle]
@@ -63,14 +67,14 @@ mod app {
     }
     
     #[task(priority = 1, shared = [a, b])]
-    async fn async_task1(mut cx: async_task1::Context, inc: u32) {
+    async fn async_task1(mut cx: async_task1::Context, inc: u16) {
         //let mut xyz= 1;
         start_atomic();
+        //cx.shared.a.lock(|a| {  *a += inc;});
         async_task2::spawn().ok();
-        cx.shared.a.lock(|a| {  *a += inc;});
-        hprintln!(
-            "hello from async 1 a {}", cx.shared.a.lock(|a|{*a}));
-        
+        // cx.shared.a.lock(|a| {  *a += inc;});
+        // hprintln!(
+        //     "hello from async 1 a {}", cx.shared.a.lock(|a|{*a}));
         end_atomic();
     }
 
@@ -78,6 +82,8 @@ mod app {
     async fn async_task2(mut cx: async_task2::Context) {
         start_atomic();
         cx.shared.a.lock(|a| {*a += 1;});
+
+       // cx.shared.b.lock(|b| {*b += 1;});
         hprintln!(
             "hello from async 2 a {}", cx.shared.a.lock(|a|{*a}));
         end_atomic();
