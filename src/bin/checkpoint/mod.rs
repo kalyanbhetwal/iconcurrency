@@ -334,24 +334,24 @@ pub fn save_variables<T>(mem_loc: *const T, size: usize) {
     unsafe{
         let mem_loc_u16 = mem_loc as *const u16;
         hprintln!("address {:0x}", transcation_log);
-        // for i in 0..2 {
-        //     let byte = (mem_loc_u16 as u32 >> (i * 16)) as u16; // Extract the byte at position i
-        //     hprintln!("bytes {:0x}", byte);
-        //     ptr::write((transcation_log+(2 *i) ) as *mut u16 , byte);
-        //     let a =   ptr::read_volatile((transcation_log+ (2 *i) ) as *mut u16);
-        //     hprintln!("written {:0x}", a);
-        // }
-        let byte = (mem_loc_u16 as u32 >> (0 * 16)) as u16; // Extract the byte at position i
-        hprintln!("bytes {:0x}", byte);
-        ptr::write((transcation_log+(2 *0 )as u32) as *mut u16 , byte);
-        let a =   ptr::read_volatile((transcation_log+ 2 *0  as u32) as *mut u16);
-        hprintln!("written {:0x}", a);
+        for i in 0..2 {
+            let byte = (mem_loc_u16 as u32 >> (i * 16)) as u16; // Extract the byte at position i
+            hprintln!("bytes {:0x}", byte);
+            ptr::write((transcation_log+(2 *i) ) as *mut u16 , byte);
+            let a =   ptr::read_volatile((transcation_log+ (2 *i) ) as *mut u16);
+            hprintln!("written {:0x}", a);
+        }
+        // let byte = (mem_loc_u16 as u32 >> (0 * 16)) as u16; // Extract the byte at position i
+        // hprintln!("bytes {:0x}", byte);
+        // ptr::write((transcation_log+((2 *0 )as u32)) as *mut u16 , byte);
+        // let a =   ptr::read_volatile((transcation_log+ ((2 *0)  as u32)) as *mut u16);
+        // hprintln!("written {:0x}", a);
 
-        let byte = (mem_loc_u16 as u32 >> (1 * 16)) as u16; // Extract the byte at position i
-        hprintln!("bytes {:0x}", byte);
-        ptr::write((transcation_log+(2 *1) as u32) as *mut u16 , byte);
-        let a =   ptr::read_volatile((transcation_log+ 2 *1 as u32) as *mut u16);
-         hprintln!("written {:0x}", a);
+        // let byte = (mem_loc_u16 as u32 >> (1 * 16)) as u16; // Extract the byte at position i
+        // hprintln!("bytes {:0x}", byte);
+        // ptr::write((transcation_log+((2 *1) as u32)) as *mut u16 , byte);
+        // let a =   ptr::read_volatile((transcation_log+ ((2 *1) as u32)) as *mut u16);
+        //  hprintln!("written {:0x}", a);
 
 
         transcation_log += 4;
