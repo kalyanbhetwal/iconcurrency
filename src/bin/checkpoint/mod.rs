@@ -333,13 +333,13 @@ pub fn initialization(){
 pub fn save_variables<T>(mem_loc: *const T, size: usize) {
     unsafe{
         let mem_loc_u16 = mem_loc as *const u16;
-        hprintln!("address {:0x}", transcation_log);
+        //hprintln!("address {:0x}", transcation_log);
         for i in 0..2 {
             let byte = (mem_loc_u16 as u32 >> (i * 16)) as u16; // Extract the byte at position i
-            hprintln!("bytes {:0x}", byte);
+            //hprintln!("bytes {:0x}", byte);
             ptr::write((transcation_log+(2 *i) ) as *mut u16 , byte);
             let a =   ptr::read_volatile((transcation_log+ (2 *i) ) as *mut u16);
-            hprintln!("written {:0x}", a);
+            //hprintln!("written {:0x}", a);
         }
         // let byte = (mem_loc_u16 as u32 >> (0 * 16)) as u16; // Extract the byte at position i
         // hprintln!("bytes {:0x}", byte);
@@ -355,20 +355,20 @@ pub fn save_variables<T>(mem_loc: *const T, size: usize) {
 
 
         transcation_log += 4;
-        hprintln!("the int t_log {:0x}", transcation_log);
+        //hprintln!("the int t_log {:0x}", transcation_log);
 
         ptr::write(transcation_log as *mut u16 , size as u16);
 
         transcation_log += 2*1; //adding 2 because of issues in fram where only even address are being written
 
-        hprintln!("the int t1_log {:0x}", transcation_log);
+        //hprintln!("the int t1_log {:0x}", transcation_log);
 
         for i in 0..size/2{
             let byte = *mem_loc_u16.add(i); 
-            hprintln!("the logged byte {:0x}", byte);
+            //hprintln!("the logged byte {:0x}", byte);
             ptr::write( (transcation_log+(2*i as u32)) as *mut u16 , byte); 
             let a =   ptr::read_volatile((transcation_log+ (2 *i as u32)) as *mut u16);
-            hprintln!("written? {:0x}", a);  
+           // hprintln!("written? {:0x}", a);  
         }
         transcation_log =  transcation_log + 2*size as u32;
         *counter +=1;
@@ -380,7 +380,7 @@ pub fn save_variables<T>(mem_loc: *const T, size: usize) {
         // let b = ptr::read(counter as *const u8 );
         // hprintln!("After logging counter is {}", b);
     }
-    hprintln!("Address: {:p}, Size: {} bytes", mem_loc, size);
+    //hprintln!("Address: {:p}, Size: {} bytes", mem_loc, size);
 }
 
 pub fn start_atomic(){
